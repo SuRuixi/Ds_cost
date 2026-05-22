@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deepseek API 成本对比分析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        huoshan: '#1664ff',
+                        ali: '#ff6a00'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [v-cloak] { display: none; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #ffffff;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            border: 2px solid currentColor;
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+        .range-huoshan::-webkit-slider-thumb { color: #1664ff; }
+        .range-ali::-webkit-slider-thumb { color: #ff6a00; }
+        .range-huoshan::-webkit-slider-runnable-track { background: linear-gradient(to right, #1664ff var(--value, 0%), #e2e8f0 var(--value, 0%)); }
+        .range-ali::-webkit-slider-runnable-track { background: linear-gradient(to right, #ff6a00 var(--value, 0%), #e2e8f0 var(--value, 0%)); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen">
+    <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8" v-cloak>
+        
+        <!-- Header -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-slate-900 mb-3 tracking-tight">Deepseek 成本对比分析</h1>
+            <p class="text-slate-500 max-w-2xl mx-auto">多场景、多模型下的火山引擎与阿里云成本动态测算（基于 100万 Tokens 总量）</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Left Panel: Controls -->
+            <div class="lg:col-span-4 space-y-6">
+                
+                <!-- Model Selection -->
+                <div class="glass-panel rounded-xl p-5">
+                    <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-4"><i class="fas fa-microchip mr-2"></i>模型选择</h3>
+                    <div class="flex p-1 bg-slate-100 rounded-lg">
+                        <button @click="model = 'pro'" :class="model === 'pro' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'" class="flex-1 py-2 text-sm font-medium rounded-md transition-all">Deepseek-v4-pro</button>
+                        <button @click="model = 'flash'" :class="model === 'flash' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'" class="flex-1 py-2 text-sm font-medium rounded-md transition-all">Deepseek-v4-flash</button>
+                    </div>
+                    
+                    <div class="mt-4 text-xs text-slate-500 bg-slate-50 p-3 rounded border border-slate-100 font-mono">
+                        <div class="flex justify-between mb-1"><span>缓存命中:</span> <span class="text-slate-700">{{ prices[model].cache.toFixed(2) }} 元/M</span></div>
+                        <div class="flex justify-between mb-1"><span>输入单价:</span> <span class="text-slate-700">{{ prices[model].input.toFixed(2) }} 元/M</span></div>
+                        <div class="flex justify-between"><span>输出单价:</span> <span class="text-slate-700">{{ prices[model].output.toFixed(2) }} 元/M</span></div>
+                    </div>
+                </div>
+
+                <!-- Huoshan Controls -->
+                <div class="glass-panel rounded-xl p-5 border-l-4 border-l-huoshan">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-slate-800">火山引擎 (Ark)</h3>
+                        <span class="px-2 py-1 bg-blue-50 text-huoshan text-xs font-bold rounded">默认原价</span>
+                    </div>
+                    
+                    <div class="space-y-5">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-slate-600">折扣比例</span>
+                                <span class="font-mono font-medium text-huoshan">{{ (huoshan.discount * 10).toFixed(1) }} 折</span>
+                            </div>
+                            <input type="range" min="0.1" max="1.0" step="0.05" v-model.number="huoshan.discount" class="range-huoshan" :style="`--value: ${huoshan.discount * 100}%`">
+                        </div>
+                        
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-slate-600">Cache 命中率</span>
+                                <span class="font-mono font-medium text-huoshan">{{ (huoshan.cacheHit * 100).toFixed(0) }}%</span>
+                            </div>
+                            <input type="range" min="0" max="1" step="0.01" v-model.number="huoshan.cacheHit" class="range-huoshan" :style="`--value: ${huoshan.cacheHit * 100}%`">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ali Controls -->
+                <div class="glass-panel rounded-xl p-5 border-l-4 border-l-ali">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-slate-800">阿里云 (Ali)</h3>
+                        <span class="px-2 py-1 bg-orange-50 text-ali text-xs font-bold rounded">默认7折</span>
+                    </div>
+                    
+                    <div class="space-y-5">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-slate-600">折扣比例</span>
+                                <span class="font-mono font-medium text-ali">{{ (ali.discount * 10).toFixed(1) }} 折</span>
+                            </div>
+                            <input type="range" min="0.1" max="1.0" step="0.05" v-model.number="ali.discount" class="range-ali" :style="`--value: ${ali.discount * 100}%`">
+                        </div>
+                        
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-slate-600">Cache 命中率</span>
+                                <span class="font-mono font-medium text-ali">{{ (ali.cacheHit * 100).toFixed(0) }}%</span>
+                            </div>
+                            <input type="range" min="0" max="1" step="0.01" v-model.number="ali.cacheHit" class="range-ali" :style="`--value: ${ali.cacheHit * 100}%`">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Results -->
+            <div class="lg:col-span-8 space-y-6">
+                
+                <!-- Conclusion Summary -->
+                <div class="glass-panel rounded-xl p-5 bg-gradient-to-br from-white to-slate-50 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-5 text-slate-400 transform translate-x-4 -translate-y-4">
+                        <i class="fas fa-chart-bar text-8xl"></i>
+                    </div>
+                    <h2 class="text-base font-bold text-slate-800 mb-3 relative z-10 flex items-center flex-wrap gap-2">
+                        <span><i class="fas fa-lightbulb text-yellow-500 mr-2"></i>综合动态结论</span>
+                        <span class="text-xs text-slate-400 font-normal">火山 {{ (huoshan.discount*10).toFixed(1) }}折/缓存{{ (huoshan.cacheHit*100).toFixed(0) }}% · 阿里 {{ (ali.discount*10).toFixed(1) }}折/缓存{{ (ali.cacheHit*100).toFixed(0) }}%</span>
+                    </h2>
+
+                    <!-- Scoreboard -->
+                    <div class="grid grid-cols-3 gap-2 mb-3 relative z-10">
+                        <div class="bg-blue-50/70 border border-blue-100 rounded-lg p-2 text-center">
+                            <div class="text-[11px] text-slate-500 mb-0.5">火山领先</div>
+                            <div class="text-xl font-bold text-huoshan">{{ summary.hsWins }}<span class="text-xs text-slate-400">/{{ summary.total }}</span></div>
+                        </div>
+                        <div class="bg-orange-50/70 border border-orange-100 rounded-lg p-2 text-center">
+                            <div class="text-[11px] text-slate-500 mb-0.5">阿里领先</div>
+                            <div class="text-xl font-bold text-ali">{{ summary.aliWins }}<span class="text-xs text-slate-400">/{{ summary.total }}</span></div>
+                        </div>
+                        <div class="bg-slate-100/70 border border-slate-200 rounded-lg p-2 text-center">
+                            <div class="text-[11px] text-slate-500 mb-0.5">综合差异</div>
+                            <div class="text-xl font-bold" :class="summary.avgWinner === 'huoshan' ? 'text-huoshan' : summary.avgWinner === 'ali' ? 'text-ali' : 'text-slate-600'">
+                                {{ summary.avgDiff }}%
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-slate-600 relative z-10 leading-relaxed border-t border-slate-100 pt-2">
+                        <span v-if="summary.overallWinner === 'huoshan'">综合 {{ summary.total }} 个场景：<strong class="text-huoshan">火山引擎</strong>在 {{ summary.hsWins }} 个场景中具有价格优势，幅度区间 <strong>{{ summary.hsMinAdv }}%~{{ summary.hsMaxAdv }}%</strong>，平均便宜 <strong>{{ summary.avgDiff }}%</strong>。</span>
+                        <span v-else-if="summary.overallWinner === 'ali'">综合 {{ summary.total }} 个场景：<strong class="text-ali">阿里云</strong>在 {{ summary.aliWins }} 个场景中具有价格优势，幅度区间 <strong>{{ summary.aliMinAdv }}%~{{ summary.aliMaxAdv }}%</strong>，平均便宜 <strong>{{ summary.avgDiff }}%</strong>。</span>
+                        <span v-else>综合 {{ summary.total }} 个场景：双方成本基本持平，需结合业务场景做最终决策。</span>
+                        <span class="text-slate-400 ml-1">* 假设理想缓存状态平稳，无 Cache Delete 与业务侧频繁切换 sessions。</span>
+                    </p>
+                </div>
+
+                <!-- Scenario Cards: 2x2 Compact Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div v-for="sc in computedScenarios" :key="sc.name" class="glass-panel rounded-xl p-4 transition hover:shadow-md">
+                        <!-- Header -->
+                        <div class="flex justify-between items-start mb-3 pb-3 border-b border-slate-100">
+                            <div class="min-w-0 flex-1">
+                                <h3 class="text-sm font-bold text-slate-800 flex items-center">
+                                    <i :class="sc.icon" class="mr-2 text-slate-400 text-xs"></i>{{ sc.name }}
+                                </h3>
+                                <div v-if="!sc.isCustom" class="text-[11px] font-mono text-slate-500 mt-1">
+                                    In:Out = {{ sc.inRatio }}:{{ sc.outRatio }}
+                                </div>
+                                <div v-else class="mt-1 flex items-center space-x-1">
+                                    <input type="number" v-model.number="customScenario.inRatio" class="w-12 bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-[11px] font-mono focus:outline-none focus:border-huoshan text-slate-700" min="0">
+                                    <span class="text-slate-400 text-xs">:</span>
+                                    <input type="number" v-model.number="customScenario.outRatio" class="w-12 bg-slate-50 border border-slate-200 rounded px-1 py-0.5 text-[11px] font-mono focus:outline-none focus:border-huoshan text-slate-700" min="0">
+                                </div>
+                            </div>
+
+                            <div class="text-right ml-2 flex-shrink-0">
+                                <div v-if="sc.winner === 'huoshan'" class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-huoshan text-[11px] font-bold">
+                                    火山 -{{ sc.advantage }}%
+                                </div>
+                                <div v-else-if="sc.winner === 'ali'" class="inline-flex items-center px-2 py-0.5 rounded-full bg-orange-50 border border-orange-100 text-ali text-[11px] font-bold">
+                                    阿里 -{{ sc.advantage }}%
+                                </div>
+                                <div v-else class="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold">
+                                    持平
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bar Chart Compact -->
+                        <div class="space-y-2 mb-3">
+                            <div class="flex items-center text-xs">
+                                <div class="w-10 text-slate-500 flex-shrink-0">火山</div>
+                                <div class="flex-1 pr-14 relative">
+                                    <div class="h-5 rounded bg-huoshan transition-all duration-500 relative" :style="{ width: Math.max((sc.hsCost / sc.maxCost) * 100, 2) + '%' }">
+                                        <span class="absolute left-full ml-2 font-mono text-[11px] font-bold text-slate-700 whitespace-nowrap top-1/2 -translate-y-1/2">{{ sc.hsCost }}元</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center text-xs">
+                                <div class="w-10 text-slate-500 flex-shrink-0">阿里</div>
+                                <div class="flex-1 pr-14 relative">
+                                    <div class="h-5 rounded bg-ali transition-all duration-500 relative" :style="{ width: Math.max((sc.aliCost / sc.maxCost) * 100, 2) + '%' }">
+                                        <span class="absolute left-full ml-2 font-mono text-[11px] font-bold text-slate-700 whitespace-nowrap top-1/2 -translate-y-1/2">{{ sc.aliCost }}元</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Breakdown Compact -->
+                        <div class="grid grid-cols-2 gap-2 text-[10px] font-mono bg-slate-50/70 p-2 rounded border border-slate-100">
+                            <div>
+                                <div class="text-huoshan font-semibold mb-1">火山明细</div>
+                                <div class="text-slate-500 leading-relaxed">
+                                    <div>Cache: {{ sc.hsCacheCost }}</div>
+                                    <div>NoCache: {{ sc.hsNoCacheCost }}</div>
+                                    <div>Output: {{ sc.hsOutCost }}</div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-ali font-semibold mb-1">阿里明细</div>
+                                <div class="text-slate-500 leading-relaxed">
+                                    <div>Cache: {{ sc.aliCacheCost }}</div>
+                                    <div>NoCache: {{ sc.aliNoCacheCost }}</div>
+                                    <div>Output: {{ sc.aliOutCost }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    model: 'pro',
+                    prices: {
+                        pro: { cache: 1, input: 12, output: 24 },
+                        flash: { cache: 0.2, input: 1, output: 2 }
+                    },
+                    huoshan: { discount: 1.0, cacheHit: 0.90 },
+                    ali: { discount: 0.7, cacheHit: 0.65 },
+                    scenarios: [
+                        { name: 'Claw 龙虾', inRatio: 100, outRatio: 1, icon: 'fas fa-bug' },
+                        { name: 'Coding', inRatio: 30, outRatio: 1, icon: 'fas fa-code' },
+                        { name: '简单打标', inRatio: 10, outRatio: 1, icon: 'fas fa-tags' }
+                    ],
+                    customScenario: {
+                        inRatio: 50,
+                        outRatio: 50
+                    },
+                    totalTokens: 1 // 1 million
+                }
+            },
+            computed: {
+                computedScenarios() {
+                    const price = this.prices[this.model];
+                    
+                    const allScenarios = [
+                        ...this.scenarios,
+                        { 
+                            name: '自定义', 
+                            inRatio: this.customScenario.inRatio, 
+                            outRatio: this.customScenario.outRatio, 
+                            icon: 'fas fa-sliders-h', 
+                            isCustom: true 
+                        }
+                    ];
+
+                    return allScenarios.map(s => {
+                        let inR = Number(s.inRatio) || 0;
+                        let outR = Number(s.outRatio) || 0;
+                        if (inR === 0 && outR === 0) { inR = 1; outR = 1; }
+                        
+                        const totalRatio = inR + outR;
+                        const inputTokens = this.totalTokens * (inR / totalRatio);
+                        const outputTokens = this.totalTokens * (outR / totalRatio);
+
+                        // Huoshan Math
+                        const hsCacheTokens = inputTokens * this.huoshan.cacheHit;
+                        const hsNoCacheTokens = inputTokens * (1 - this.huoshan.cacheHit);
+                        
+                        const hsCacheCost = hsCacheTokens * price.cache * this.huoshan.discount;
+                        const hsNoCacheCost = hsNoCacheTokens * price.input * this.huoshan.discount;
+                        const hsOutCost = outputTokens * price.output * this.huoshan.discount;
+                        const hsCost = hsCacheCost + hsNoCacheCost + hsOutCost;
+
+                        // Ali Math
+                        const aliCacheTokens = inputTokens * this.ali.cacheHit;
+                        const aliNoCacheTokens = inputTokens * (1 - this.ali.cacheHit);
+                        
+                        const aliCacheCost = aliCacheTokens * price.cache * this.ali.discount;
+                        const aliNoCacheCost = aliNoCacheTokens * price.input * this.ali.discount;
+                        const aliOutCost = outputTokens * price.output * this.ali.discount;
+                        const aliCost = aliCacheCost + aliNoCacheCost + aliOutCost;
+
+                        let advantage = 0;
+                        let winner = 'tie';
+                        
+                        if (hsCost < aliCost) {
+                            winner = 'huoshan';
+                            advantage = ((aliCost - hsCost) / aliCost) * 100;
+                        } else if (aliCost < hsCost) {
+                            winner = 'ali';
+                            advantage = ((hsCost - aliCost) / hsCost) * 100;
+                        }
+
+                        // threshold for tie (e.g. difference is less than 0.01%)
+                        if (Math.abs(hsCost - aliCost) < 0.0001) {
+                            winner = 'tie';
+                            advantage = 0;
+                        }
+
+                        const maxCost = Math.max(hsCost, aliCost);
+
+                        return {
+                            ...s,
+                            hsCost: hsCost.toFixed(4),
+                            aliCost: aliCost.toFixed(4),
+                            hsCacheCost: hsCacheCost.toFixed(4),
+                            hsNoCacheCost: hsNoCacheCost.toFixed(4),
+                            hsOutCost: hsOutCost.toFixed(4),
+                            aliCacheCost: aliCacheCost.toFixed(4),
+                            aliNoCacheCost: aliNoCacheCost.toFixed(4),
+                            aliOutCost: aliOutCost.toFixed(4),
+                            advantage: advantage.toFixed(2),
+                            winner,
+                            maxCost: maxCost === 0 ? 1 : maxCost
+                        };
+                    });
+                },
+                overallWinner() {
+                    return this.summary.overallWinner;
+                },
+                maxAdvantage() {
+                    return this.summary.maxAdvantage;
+                },
+                summary() {
+                    const scenarios = this.computedScenarios;
+                    const total = scenarios.length;
+                    let hsWins = 0, aliWins = 0, ties = 0;
+                    let hsAdvs = [], aliAdvs = [];
+                    let totalHsCost = 0, totalAliCost = 0;
+
+                    scenarios.forEach(s => {
+                        const adv = parseFloat(s.advantage);
+                        if (s.winner === 'huoshan') {
+                            hsWins++;
+                            hsAdvs.push(adv);
+                        } else if (s.winner === 'ali') {
+                            aliWins++;
+                            aliAdvs.push(adv);
+                        } else {
+                            ties++;
+                        }
+                        totalHsCost += parseFloat(s.hsCost);
+                        totalAliCost += parseFloat(s.aliCost);
+                    });
+
+                    let overallWinner = 'tie';
+                    if (hsWins > aliWins) overallWinner = 'huoshan';
+                    else if (aliWins > hsWins) overallWinner = 'ali';
+
+                    // average diff based on total cost summation across scenarios
+                    let avgDiff = 0;
+                    let avgWinner = 'tie';
+                    if (totalHsCost < totalAliCost && totalAliCost > 0) {
+                        avgWinner = 'huoshan';
+                        avgDiff = ((totalAliCost - totalHsCost) / totalAliCost) * 100;
+                    } else if (totalAliCost < totalHsCost && totalHsCost > 0) {
+                        avgWinner = 'ali';
+                        avgDiff = ((totalHsCost - totalAliCost) / totalHsCost) * 100;
+                    }
+
+                    const hsMinAdv = hsAdvs.length ? Math.min(...hsAdvs).toFixed(1) : '0.0';
+                    const hsMaxAdv = hsAdvs.length ? Math.max(...hsAdvs).toFixed(1) : '0.0';
+                    const aliMinAdv = aliAdvs.length ? Math.min(...aliAdvs).toFixed(1) : '0.0';
+                    const aliMaxAdv = aliAdvs.length ? Math.max(...aliAdvs).toFixed(1) : '0.0';
+
+                    let maxAdvantage = 0;
+                    scenarios.forEach(s => {
+                        const adv = parseFloat(s.advantage);
+                        if (s.winner === overallWinner && adv > maxAdvantage) maxAdvantage = adv;
+                    });
+
+                    return {
+                        total,
+                        hsWins,
+                        aliWins,
+                        ties,
+                        overallWinner,
+                        avgWinner,
+                        avgDiff: avgDiff.toFixed(1),
+                        hsMinAdv,
+                        hsMaxAdv,
+                        aliMinAdv,
+                        aliMaxAdv,
+                        maxAdvantage: maxAdvantage.toFixed(1)
+                    };
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>

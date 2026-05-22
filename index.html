@@ -65,12 +65,12 @@
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen">
-    <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8" v-cloak>
+    <div id="app" class="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8" v-cloak>
         
         <!-- Header -->
         <header class="mb-8 text-center">
             <h1 class="text-3xl font-bold text-slate-900 mb-3 tracking-tight">Deepseek 成本对比分析</h1>
-            <p class="text-slate-500 max-w-2xl mx-auto">多场景、多模型下的火山引擎与阿里云成本动态测算（基于 100万 Tokens 总量）</p>
+            <p class="text-slate-500 max-w-2xl mx-auto">多场景、多模型下的火山引擎与阿里云成本动态测算（基于 {{ totalTokens }}百万 Tokens 总量）</p>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -79,7 +79,16 @@
                 
                 <!-- Model Selection -->
                 <div class="glass-panel rounded-xl p-5">
-                    <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-4"><i class="fas fa-microchip mr-2"></i>模型选择</h3>
+                    <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-4"><i class="fas fa-microchip mr-2"></i>基础设置</h3>
+                    
+                    <div class="mb-4">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Tokens 总量 (百万)</label>
+                        <div class="flex items-center">
+                            <input type="number" v-model.number="totalTokens" min="0.1" step="0.1" class="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-huoshan focus:ring-1 focus:ring-huoshan text-slate-700 transition-all">
+                        </div>
+                    </div>
+
+                    <label class="block text-xs font-medium text-slate-600 mb-1">模型选择</label>
                     <div class="flex p-1 bg-slate-100 rounded-lg">
                         <button @click="model = 'pro'" :class="model === 'pro' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'" class="flex-1 py-2 text-sm font-medium rounded-md transition-all">Deepseek-v4-pro</button>
                         <button @click="model = 'flash'" :class="model === 'flash' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'" class="flex-1 py-2 text-sm font-medium rounded-md transition-all">Deepseek-v4-flash</button>
@@ -220,7 +229,7 @@
                         <div class="space-y-2 mb-3">
                             <div class="flex items-center text-xs">
                                 <div class="w-10 text-slate-500 flex-shrink-0">火山</div>
-                                <div class="flex-1 pr-14 relative">
+                                <div class="flex-1 pr-24 relative">
                                     <div class="h-5 rounded bg-huoshan transition-all duration-500 relative" :style="{ width: Math.max((sc.hsCost / sc.maxCost) * 100, 2) + '%' }">
                                         <span class="absolute left-full ml-2 font-mono text-[11px] font-bold text-slate-700 whitespace-nowrap top-1/2 -translate-y-1/2">{{ sc.hsCost }}元</span>
                                     </div>
@@ -228,7 +237,7 @@
                             </div>
                             <div class="flex items-center text-xs">
                                 <div class="w-10 text-slate-500 flex-shrink-0">阿里</div>
-                                <div class="flex-1 pr-14 relative">
+                                <div class="flex-1 pr-24 relative">
                                     <div class="h-5 rounded bg-ali transition-all duration-500 relative" :style="{ width: Math.max((sc.aliCost / sc.maxCost) * 100, 2) + '%' }">
                                         <span class="absolute left-full ml-2 font-mono text-[11px] font-bold text-slate-700 whitespace-nowrap top-1/2 -translate-y-1/2">{{ sc.aliCost }}元</span>
                                     </div>
